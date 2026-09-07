@@ -4,14 +4,34 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   generateRegistrationOptions, verifyRegistrationResponse,
   generateAuthenticationOptions, verifyAuthenticationResponse
 } from '@simplewebauthn/server';
 import webpush from 'web-push';
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Load repo-root .env when present (docker compose already injects env; do not override).
+try {
+  const envFile = path.join(ROOT, '.env');
+  if (fs.existsSync(envFile)) {
+    for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const i = t.indexOf('=');
+      if (i < 1) continue;
+      const k = t.slice(0, i).trim();
+      let v = t.slice(i + 1).trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      if (process.env[k] === undefined) process.env[k] = v;
+    }
+  }
+} catch { /* ignore unreadable .env */ }
+
 const PORT = +(process.env.PORT || 3000);
-const DATA = process.env.DATA_DIR || '/data';
+const dataRaw = process.env.DATA_DIR || '/data';
+const DATA = path.isAbsolute(dataRaw) ? dataRaw : path.resolve(ROOT, dataRaw);
 const RP_ID = process.env.RP_ID || 'localhost';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
 const RP_NAME = process.env.RP_NAME || 'openGym';
